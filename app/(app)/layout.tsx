@@ -21,14 +21,15 @@ async function AuthedPaywalledLayout({
   const supabase = createClient();
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
 
-  if (!session?.user) {
+  if (userError || !user) {
     redirect("/login");
   }
 
-  const subscription = await getSubscription(session.user.id);
+  const subscription = await getSubscription(user.id);
   if (!isActiveOrTrial(subscription)) {
     redirect("/subscribe");
   }

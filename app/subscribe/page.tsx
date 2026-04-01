@@ -26,7 +26,7 @@ export default function SubscribePage() {
             Subscribe (coming soon)
           </button>
           <a
-            href="/login"
+            href="/api/auth/logout"
             className="inline-flex items-center justify-center rounded-md border border-neutral-200 px-4 py-2 text-sm font-medium"
           >
             Switch account
