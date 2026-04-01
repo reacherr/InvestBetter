@@ -1,16 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { calculateMultiplier, type MarketSnapshot } from "@/lib/signal-engine";
+import { buildSignalSuccessPayload } from "@/lib/signal-api";
+import type { MarketDataRow } from "@/lib/market-snapshot";
 import { createClient } from "@/lib/supabase/server";
-
-type MarketDataRow = {
-  date: string;
-  nifty_close: number;
-  nifty_pe: number;
-  india_vix: number;
-  ma_200: number | null;
-  pe_5yr_avg: number | null;
-};
 
 export async function GET() {
   try {
@@ -33,9 +25,7 @@ export async function GET() {
       .maybeSingle<MarketDataRow>();
 
     if (latestError) {
-      if (process.env.NODE_ENV !== "production") {
-        console.error("market_data latest lookup failed", latestError);
-      }
+      console.error("market_data latest lookup failed", latestError.message);
       return NextResponse.json(
         { ok: false, error: "MARKET_DATA_LOOKUP_FAILED" },
         { status: 500 },
@@ -49,39 +39,15 @@ export async function GET() {
       );
     }
 
-    const snapshot: MarketSnapshot = {
-      niftyPE: latest.nifty_pe,
-      pe5yrAvg: latest.pe_5yr_avg ?? latest.nifty_pe,
-      niftyClose: latest.nifty_close,
-      ma200: latest.ma_200 ?? latest.nifty_close,
-      vix: latest.india_vix,
-      monthsBelow200DMA: 0,
-      drawdownFrom52wHigh: 0,
-    };
-
-    const result = calculateMultiplier(snapshot);
-
-    return NextResponse.json(
-      {
-        ok: true,
-        asOf: latest.date,
-        multiplier: result.multiplier,
-        peSignal: result.peSignal,
-        trendSignal: result.trendSignal,
-        vixSignal: result.vixSignal,
-        geoOverride: result.geoOverride,
-        breakdown: result.breakdown,
-      },
-      { status: 200 },
-    );
+    return NextResponse.json(buildSignalSuccessPayload(latest), { status: 200 });
   } catch (err) {
-    if (process.env.NODE_ENV !== "production") {
-      console.error("GET /api/signal failed", err);
-    }
+    console.error(
+      "GET /api/signal failed",
+      err instanceof Error ? err.message : err,
+    );
     return NextResponse.json(
-      { ok: false, error: "SIGNAL_UNAVAILABLE" },
-      { status: 503 },
+      { ok: false, error: "SIGNAL_INTERNAL_ERROR" },
+      { status: 500 },
     );
   }
 }
-

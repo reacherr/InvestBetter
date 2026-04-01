@@ -9,7 +9,10 @@ export type MarketDataRow = {
   pe_5yr_avg: number | null;
 };
 
-/** Same defaults as `/api/signal` so dashboard and API stay aligned. */
+/**
+ * Maps a cached `market_data` row to the engine snapshot.
+ * `monthsBelow200DMA` / `drawdownFrom52wHigh` are not stored in v1 cache yet — geo override stays inert until ingested.
+ */
 export function marketRowToSnapshot(row: MarketDataRow): MarketSnapshot {
   return {
     niftyPE: row.nifty_pe,

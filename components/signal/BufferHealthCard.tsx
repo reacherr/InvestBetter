@@ -1,4 +1,9 @@
-type Health = "healthy" | "caution" | "low" | "unknown";
+import {
+  bufferHealthTier,
+  bufferMultiple,
+  isBufferStale,
+  type BufferHealthTier,
+} from "@/lib/buffer-health";
 
 type Props = {
   baseSip: number;
@@ -6,14 +11,7 @@ type Props = {
   bufferUpdatedAt: string | null;
 };
 
-function healthFromMultiple(m: number | null): Health {
-  if (m == null || !Number.isFinite(m)) return "unknown";
-  if (m > 6) return "healthy";
-  if (m >= 4) return "caution";
-  return "low";
-}
-
-function healthLabel(h: Health) {
+function healthLabel(h: BufferHealthTier) {
   switch (h) {
     case "healthy":
       return "Healthy";
@@ -26,7 +24,7 @@ function healthLabel(h: Health) {
   }
 }
 
-function healthClass(h: Health) {
+function healthClass(h: BufferHealthTier) {
   switch (h) {
     case "healthy":
       return "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-100";
@@ -39,20 +37,15 @@ function healthClass(h: Health) {
   }
 }
 
-function daysBetween(a: Date, b: Date) {
-  return Math.floor((a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24));
-}
-
 export function BufferHealthCard({
   baseSip,
   bufferAmount,
   bufferUpdatedAt,
 }: Props) {
-  const multiple =
-    bufferAmount != null && baseSip > 0 ? bufferAmount / baseSip : null;
-  const health = healthFromMultiple(multiple);
+  const multiple = bufferMultiple(bufferAmount, baseSip);
+  const health = bufferHealthTier(multiple);
   const updated = bufferUpdatedAt ? new Date(bufferUpdatedAt) : null;
-  const stale = updated !== null && daysBetween(new Date(), updated) > 90;
+  const stale = isBufferStale(bufferUpdatedAt, new Date());
 
   return (
     <div
