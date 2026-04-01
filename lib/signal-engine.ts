@@ -138,3 +138,24 @@ export function calculateMultiplier(market: MarketSnapshot): SignalResult {
   return { multiplier, peSignal, trendSignal, vixSignal, geoOverride, breakdown };
 }
 
+export function calculateFundDeployment(
+  baseSip: number,
+  multiplier: number,
+  funds: {
+    name: string;
+    weightPercent: number;
+    applyMultiplier: boolean;
+  }[],
+): { name: string; amount: number; weight: number }[] {
+  const totalDeployment = Math.round(baseSip * multiplier);
+
+  return funds.map((fund) => {
+    const baseAmount = Math.round(baseSip * (fund.weightPercent / 100));
+    if (!fund.applyMultiplier) {
+      return { name: fund.name, amount: baseAmount, weight: fund.weightPercent };
+    }
+    const amount = Math.round(totalDeployment * (fund.weightPercent / 100));
+    return { name: fund.name, amount, weight: fund.weightPercent };
+  });
+}
+
