@@ -16,6 +16,8 @@ InvestBetter is a web app that suggests a monthly SIP multiplier for Indian mutu
 
 Compliance: the product is a calculator based on market data and **not investment advice**; UI copy must avoid advisory language and always show the required disclaimer.
 
+**v1 lock (timing):** Notifications are sent on **SIP date − 1** after market close, so users have the evening before + the SIP day to act. (Some earlier project notes described “on SIP date”; v1 uses SIP date − 1.)
+
 ## Goals / non-goals
 
 - **Goals**
@@ -25,7 +27,7 @@ Compliance: the product is a calculator based on market data and **not investmen
 
 - **Non-goals (v1)**
   - Backtest page
-  - Email notifications
+  - Email notifications (Telegram-only in v1)
   - Advanced “notification day preference” UX beyond SIP-date-driven timing
 
 ## Tech choices
@@ -156,6 +158,8 @@ Responsibility:
 
 #### SIP-date-driven notification timing (locked)
 
+- **Timezone rule (critical):** all `today`/`tomorrow`/`daysInMonth` computations are done in **Asia/Kolkata (IST)**. Do not use server-local or UTC date boundaries for selection.
+
 - Users get notified **the evening before** their SIP date.
 - Let:
   - `today = cron run date` (notification day)
@@ -179,6 +183,7 @@ Implementation:
 
 - Query `market_data` for the latest row with `date <= notifyDate` and use that.
 - Since holidays/weekends have no row, the query naturally returns the last available trading day.
+- If no eligible `market_data` row exists yet (fresh database / fetch failure), skip processing for the run and emit an error for investigation (do not insert “fake” rows).
 
 ## Cron idempotency & deduplication (locked)
 
@@ -207,12 +212,14 @@ Recommended algorithm (high level):
 
 ## Telegram notifications (v1)
 
-- If `profiles.telegram_chat_id` is missing, skip sending (and leave `notification_sent=false` or store a separate “skipped” state in future iterations; v1 can treat it as “not sent” but should avoid infinite retries by checking chat id presence before attempting send).
+- If `profiles.telegram_chat_id` is missing, skip sending and do not insert a `signals` row for that user-month (avoids infinite resend retries until Telegram is connected).
 - Message contents:
   - Month label (derived from `signal_month`)
   - Suggested multiplier + suggested amount
   - Short generic breakdown bullets (no thresholds)
   - Reminder: “This is not investment advice” disclaimer snippet
+
+**IP protection:** Do not include numeric thresholds/cutoffs in any output surface: `/api/signal`, dashboard props, cron logs, or Telegram messages.
 
 ## Security / secrets
 
