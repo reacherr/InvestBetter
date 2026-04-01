@@ -15,31 +15,20 @@ export async function ensureFirstLoginProvisioning(
 
   const userId = user.id;
 
-  const { data: existingProfile, error: profileSelectError } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("id", userId)
-    .maybeSingle();
+  const { error: profileUpsertError } = await supabase.from("profiles").upsert(
+    {
+      id: userId,
+      email: user.email,
+      name:
+        typeof user.user_metadata?.full_name === "string"
+          ? user.user_metadata.full_name
+          : null,
+    },
+    { onConflict: "id" },
+  );
 
-  if (profileSelectError) {
-    throw profileSelectError;
-  }
-
-  if (!existingProfile) {
-    const { error: profileInsertError } = await supabase
-      .from("profiles")
-      .insert({
-        id: userId,
-        email: user.email,
-        name:
-          typeof user.user_metadata?.full_name === "string"
-            ? user.user_metadata.full_name
-            : null,
-      });
-
-    if (profileInsertError) {
-      throw profileInsertError;
-    }
+  if (profileUpsertError) {
+    throw profileUpsertError;
   }
 
   const { data: existingSubscription, error: subscriptionSelectError } =
@@ -64,7 +53,18 @@ export async function ensureFirstLoginProvisioning(
       });
 
     if (subscriptionInsertError) {
-      throw subscriptionInsertError;
+      // Handle select-then-insert race: unique(user_id) may already exist.
+      // Postgres unique violation is 23505.
+      if (
+        typeof subscriptionInsertError === "object" &&
+        subscriptionInsertError !== null &&
+        "code" in subscriptionInsertError &&
+        subscriptionInsertError.code === "23505"
+      ) {
+        // Another request created it first; safe to proceed.
+      } else {
+        throw subscriptionInsertError;
+      }
     }
   }
 
