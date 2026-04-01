@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { calculateMultiplier } from "@/lib/signal-engine";
-import { marketRowToSnapshot, type MarketDataRow } from "@/lib/market-snapshot";
+import { buildSignalSuccessPayload } from "@/lib/signal-api";
+import type { MarketDataRow } from "@/lib/market-snapshot";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET() {
@@ -41,21 +41,7 @@ export async function GET() {
       );
     }
 
-    const result = calculateMultiplier(marketRowToSnapshot(latest));
-
-    return NextResponse.json(
-      {
-        ok: true,
-        asOf: latest.date,
-        multiplier: result.multiplier,
-        peSignal: result.peSignal,
-        trendSignal: result.trendSignal,
-        vixSignal: result.vixSignal,
-        geoOverride: result.geoOverride,
-        breakdown: result.breakdown,
-      },
-      { status: 200 },
-    );
+    return NextResponse.json(buildSignalSuccessPayload(latest), { status: 200 });
   } catch (err) {
     if (process.env.NODE_ENV !== "production") {
       console.error("GET /api/signal failed", err);
