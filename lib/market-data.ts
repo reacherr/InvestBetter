@@ -4,6 +4,15 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isAbortError(err: unknown) {
+  return (
+    err instanceof Error &&
+    (err.name === "AbortError" ||
+      err.message.toLowerCase().includes("aborted") ||
+      err.message.toLowerCase().includes("aborterror"))
+  );
+}
+
 function formatIstDateParts(d: Date) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
@@ -96,16 +105,27 @@ async function nseFetchJson<T>(path: string, init?: { signal?: AbortSignal }) {
         cookie = await fetchNseCookies();
       }
 
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12_000);
+      const signal = init?.signal
+        ? AbortSignal.any([init.signal, controller.signal])
+        : controller.signal;
+
       const res = await fetch(url, {
         method: "GET",
         headers: buildNseHeaders(cookie),
         redirect: "follow",
-        signal: init?.signal,
+        signal,
       });
+      clearTimeout(timeout);
 
       if (res.status === 401 || res.status === 403) {
         cookie = null;
         throw new Error(`NSE request blocked (${res.status})`);
+      }
+
+      if (res.status === 429) {
+        throw new Error("NSE rate limited (429)");
       }
 
       if (!res.ok) {
@@ -115,6 +135,12 @@ async function nseFetchJson<T>(path: string, init?: { signal?: AbortSignal }) {
       return (await res.json()) as T;
     } catch (err) {
       lastErr = err;
+      if (init?.signal?.aborted) {
+        throw err;
+      }
+      if (isAbortError(err)) {
+        throw err;
+      }
       const backoffMs = 500 * Math.pow(2, attempt) + Math.floor(Math.random() * 200);
       await sleep(backoffMs);
     }
@@ -205,7 +231,7 @@ export async function fetchNseMarketSnapshot(): Promise<{
   return { asOfIstDate, niftyClose, niftyPE, indiaVix };
 }
 
-export async function fetchNiftySnapshot(): Promise<{
+async function fetchNiftySnapshot(): Promise<{
   niftyClose: number;
   niftyPE: number;
 }> {
@@ -225,7 +251,7 @@ export async function fetchNiftySnapshot(): Promise<{
   return { niftyClose, niftyPE };
 }
 
-export async function fetchIndiaVix(): Promise<number> {
+async function fetchIndiaVix(): Promise<number> {
   const json = await fetchAllIndices();
   const rows = Array.isArray(json.data) ? json.data : [];
   const vix = rows.find(

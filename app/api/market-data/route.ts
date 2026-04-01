@@ -87,7 +87,7 @@ export async function GET() {
 
     const { data: inserted, error: insertError } = await supabase
       .from("market_data")
-      .insert(payload)
+      .upsert(payload, { onConflict: "date" })
       .select(
         "date,nifty_close,nifty_pe,india_vix,ma_200,pe_5yr_avg,fetched_at",
       )
