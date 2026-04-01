@@ -8,7 +8,9 @@ export async function GET() {
     const { data, error } = await supabase.auth.getSession();
 
     if (error) {
-      console.error("supabase.auth.getSession failed", error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("supabase.auth.getSession failed", error);
+      }
       return NextResponse.json(
         { ok: false, hasSession: false },
         { status: 500 },
@@ -20,7 +22,9 @@ export async function GET() {
       { status: 200 },
     );
   } catch (err) {
-    console.error("supabase health check failed", err);
+    if (process.env.NODE_ENV !== "production") {
+      console.error("supabase health check failed", err);
+    }
     return NextResponse.json(
       { ok: false, hasSession: false },
       { status: 500 },
