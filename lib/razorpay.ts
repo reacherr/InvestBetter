@@ -4,11 +4,26 @@ import crypto from "node:crypto";
 
 import Razorpay from "razorpay";
 
+/** Missing or invalid Razorpay env used at checkout; stable `code` for routing (not message text). */
+export class RazorpayConfigError extends Error {
+  readonly code: "plan" | "keys";
+
+  constructor(code: "plan" | "keys", message: string) {
+    super(message);
+    this.name = "RazorpayConfigError";
+    this.code = code;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
 export function getRazorpay(): Razorpay {
   const keyId = process.env.RAZORPAY_KEY_ID;
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
   if (!keyId || !keySecret) {
-    throw new Error("RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are required");
+    throw new RazorpayConfigError(
+      "keys",
+      "RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are required",
+    );
   }
   return new Razorpay({ key_id: keyId, key_secret: keySecret });
 }
@@ -16,7 +31,10 @@ export function getRazorpay(): Razorpay {
 export function getPlanId(): string {
   const planId = process.env.RAZORPAY_PLAN_ID;
   if (!planId) {
-    throw new Error("RAZORPAY_PLAN_ID is required for subscriptions");
+    throw new RazorpayConfigError(
+      "plan",
+      "RAZORPAY_PLAN_ID is required for subscriptions",
+    );
   }
   return planId;
 }

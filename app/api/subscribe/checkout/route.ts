@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { NextResponse } from "next/server";
 
-import { getPlanId, getRazorpay } from "@/lib/razorpay";
+import { getPlanId, getRazorpay, RazorpayConfigError } from "@/lib/razorpay";
 import { getSubscription, isActiveOrTrial } from "@/lib/subscription";
 import { createClient } from "@/lib/supabase/server";
 
@@ -85,6 +85,7 @@ export async function GET(request: Request) {
       }
     }
 
+    // SDK types omit fields we pass; cast matches Razorpay dashboard subscription create API.
     const rzSub = await rz.subscriptions.create({
       plan_id: planId,
       customer_id: customerId,
@@ -118,12 +119,12 @@ export async function GET(request: Request) {
 
     return NextResponse.redirect(rzSub.short_url);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes("RAZORPAY_PLAN_ID")) {
+    if (e instanceof RazorpayConfigError) {
       return NextResponse.redirect(
         new URL("/subscribe?error=config", origin),
       );
     }
+    const msg = e instanceof Error ? e.message : String(e);
     console.error("subscribe checkout failed", msg);
     return NextResponse.redirect(
       new URL("/subscribe?error=razorpay", origin),

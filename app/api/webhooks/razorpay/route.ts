@@ -99,7 +99,10 @@ export async function POST(request: Request) {
           })
           .eq("user_id", userId);
         if (error) {
-          console.error("webhook subscription.activated update failed", error.message);
+          console.error(
+            `webhook ${event ?? "subscription.activated"} update failed`,
+            error.message,
+          );
           return NextResponse.json({ ok: false }, { status: 500 });
         }
         break;
@@ -114,7 +117,10 @@ export async function POST(request: Request) {
           })
           .eq("user_id", userId);
         if (error) {
-          console.error("webhook subscription.charged update failed", error.message);
+          console.error(
+            `webhook ${event ?? "subscription.charged"} update failed`,
+            error.message,
+          );
           return NextResponse.json({ ok: false }, { status: 500 });
         }
         break;
@@ -129,7 +135,7 @@ export async function POST(request: Request) {
           })
           .eq("user_id", userId);
         if (error) {
-          console.error("webhook subscription.cancelled update failed", error.message);
+          console.error(`webhook ${event ?? "subscription"} update failed`, error.message);
           return NextResponse.json({ ok: false }, { status: 500 });
         }
         break;
@@ -144,7 +150,7 @@ export async function POST(request: Request) {
           })
           .eq("user_id", userId);
         if (error) {
-          console.error("webhook subscription.completed update failed", error.message);
+          console.error(`webhook ${event ?? "subscription"} update failed`, error.message);
           return NextResponse.json({ ok: false }, { status: 500 });
         }
         break;

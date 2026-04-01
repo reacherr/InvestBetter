@@ -1,7 +1,13 @@
 import crypto from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { unixSecondsToIso, verifyWebhookSignature } from "./razorpay";
+import {
+  getPlanId,
+  getRazorpay,
+  RazorpayConfigError,
+  unixSecondsToIso,
+  verifyWebhookSignature,
+} from "./razorpay";
 
 describe("verifyWebhookSignature", () => {
   beforeEach(() => {
@@ -25,6 +31,39 @@ describe("verifyWebhookSignature", () => {
 
   it("returns false when signature is missing", () => {
     expect(verifyWebhookSignature("{}", null)).toBe(false);
+  });
+});
+
+describe("RazorpayConfigError", () => {
+  it("getPlanId throws with code plan when RAZORPAY_PLAN_ID is missing", () => {
+    const prev = process.env.RAZORPAY_PLAN_ID;
+    delete process.env.RAZORPAY_PLAN_ID;
+    try {
+      getPlanId();
+      expect.fail("expected throw");
+    } catch (e) {
+      expect(e).toBeInstanceOf(RazorpayConfigError);
+      expect((e as RazorpayConfigError).code).toBe("plan");
+    } finally {
+      if (prev !== undefined) process.env.RAZORPAY_PLAN_ID = prev;
+    }
+  });
+
+  it("getRazorpay throws with code keys when key env is missing", () => {
+    const prevId = process.env.RAZORPAY_KEY_ID;
+    const prevSecret = process.env.RAZORPAY_KEY_SECRET;
+    delete process.env.RAZORPAY_KEY_ID;
+    delete process.env.RAZORPAY_KEY_SECRET;
+    try {
+      getRazorpay();
+      expect.fail("expected throw");
+    } catch (e) {
+      expect(e).toBeInstanceOf(RazorpayConfigError);
+      expect((e as RazorpayConfigError).code).toBe("keys");
+    } finally {
+      if (prevId !== undefined) process.env.RAZORPAY_KEY_ID = prevId;
+      if (prevSecret !== undefined) process.env.RAZORPAY_KEY_SECRET = prevSecret;
+    }
   });
 });
 
