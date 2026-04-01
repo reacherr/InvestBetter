@@ -46,10 +46,30 @@ Source of truth remains `investbetter-cursor-spec.md`. v1 uses these key tables:
 - `profiles`: user profile + `telegram_chat_id`
 - `sip_configs`: `base_sip_amount`, optional `monthly_surplus`, `sip_date` (1–31)
   - Dates 29–31 fire on the last day for short months.
+  - `buffer_amount`: user-reported current arbitrage buffer balance (rupees)
+  - `buffer_updated_at`: last time user manually updated `buffer_amount`
+  - `date_change_count` / `date_change_reset_month`: caps SIP date changes (see below)
 - `fund_allocations`: user funds, weights, `apply_multiplier` toggle (e.g., gold off)
 - `market_data`: daily cache of Nifty close, PE, VIX, 200DMA (+ derived fields)
 - `signals`: one per user per month: `unique(user_id, signal_month)` and `notification_sent`
 - `subscriptions`: trial/active/cancelled/expired + Razorpay ids
+
+### SIP date change cap (locked)
+
+To prevent users from “gaming” the system by repeatedly shifting SIP dates to chase a better multiplier, v1 enforces:
+
+- **Cap**: SIP date can be changed **up to 2 times per calendar month**
+- **Reset**: resets on the **1st of each calendar month** (not rolling 30 days)
+
+Storage on `sip_configs`:
+
+- `date_change_count` (integer, default 0): number of SIP date changes used in the current month
+- `date_change_reset_month` (date): first day of the month this counter applies to (e.g., `2026-04-01`)
+
+UX:
+
+- Show “**X changes left this month**” near the SIP date field.
+- Copy should explain the reason: frequent SIP date changes can undermine the strategy’s discipline.
 
 ### Signal month rule (locked)
 
@@ -80,10 +100,23 @@ General rule:
   - Multiplier + suggested amount
   - Signal breakdown (generic; no thresholds/cutoffs)
   - Fund split amounts
-  - Buffer health card
+  - Buffer health card (derived from buffer ÷ base SIP)
 - `/settings` (minimal v1)
   - Telegram connect (store `telegram_chat_id`)
   - Billing status / manage subscription entry point
+
+### Buffer balance update UX (locked)
+
+Buffer is an explicit part of the strategy and should be user-editable, but thoughtfully:
+
+- **Buffer balance update**: user can update `buffer_amount` any time (“I transferred ₹50,000 into my arbitrage fund.”).
+  - Add a small friction step: a confirmation like “Confirm you’ve transferred this amount to your arbitrage fund.”
+  - On save, set `buffer_updated_at = now()`.
+- **Buffer health status**: always computed by the app as `buffer_amount ÷ base_sip_amount` and shown as healthy / caution / low.
+
+Staleness nudge:
+
+- If `buffer_updated_at` is older than ~90 days, show a subtle prompt: “Your buffer balance was last updated 90+ days ago — is it still accurate?”
 
 ## Auth & paywall (hard blocking)
 
@@ -249,4 +282,14 @@ Recommended algorithm (high level):
 - Email notifications (Resend)
 - Backtest and history UX polish
 - Admin tooling for monitoring cron and notifications
+
+## Schema deltas for v1 decisions
+
+The source schema in `investbetter-cursor-spec.md` is extended with:
+
+- Add to `sip_configs`:
+  - `date_change_count integer not null default 0`
+  - `date_change_reset_month date`
+  - `buffer_amount integer`
+  - `buffer_updated_at timestamptz`
 
