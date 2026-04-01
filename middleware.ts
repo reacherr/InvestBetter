@@ -4,6 +4,11 @@ import { createServerClient } from "@supabase/ssr";
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next();
+  const cookiesToApply: Array<{
+    name: string;
+    value: string;
+    options: Parameters<typeof response.cookies.set>[2];
+  }> = [];
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -20,10 +25,10 @@ export async function middleware(request: NextRequest) {
       getAll() {
         return request.cookies.getAll();
       },
-      setAll(cookiesToSet) {
-        for (const { name, value, options } of cookiesToSet) {
-          response.cookies.set(name, value, options);
-        }
+      setAll(incomingCookies) {
+        incomingCookies.forEach(({ name, value, options }) => {
+          cookiesToApply.push({ name, value, options });
+        });
       },
     },
   });
@@ -35,7 +40,10 @@ export async function middleware(request: NextRequest) {
   if (!session) {
     const loginUrl = new URL("/login", request.url);
     response = NextResponse.redirect(loginUrl);
-    return response;
+  }
+
+  for (const { name, value, options } of cookiesToApply) {
+    response.cookies.set(name, value, options);
   }
 
   return response;
