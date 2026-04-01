@@ -34,5 +34,7 @@ describe("marketRowToSnapshot", () => {
     });
     expect(snap.pe5yrAvg).toBe(22);
     expect(snap.ma200).toBe(20_000);
+    expect(snap.monthsBelow200DMA).toBe(0);
+    expect(snap.drawdownFrom52wHigh).toBe(0);
   });
 });

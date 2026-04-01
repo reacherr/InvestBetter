@@ -1,6 +1,8 @@
+import "server-only";
+
 import { createClient } from "@supabase/supabase-js";
 
-/** Service role client for cron and other server jobs (bypasses RLS). */
+/** Service role client for cron, webhooks, and other server jobs (bypasses RLS). */
 export function createServiceRoleClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;

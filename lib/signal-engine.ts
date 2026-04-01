@@ -39,7 +39,9 @@ export function calculateMultiplier(market: MarketSnapshot): SignalResult {
   const pe5yrAvgSafe =
     Number.isFinite(market.pe5yrAvg) && market.pe5yrAvg > 0
       ? market.pe5yrAvg
-      : market.niftyPE;
+      : Number.isFinite(market.niftyPE) && market.niftyPE > 0
+        ? market.niftyPE
+        : 1;
   const peRatio = market.niftyPE / pe5yrAvgSafe;
 
   // --- PE Signal ---
@@ -120,7 +122,7 @@ export function calculateMultiplier(market: MarketSnapshot): SignalResult {
     });
   }
 
-  // --- Geopolitical Override ---
+  // --- Geopolitical Override (inputs not yet populated from market_data in v1) ---
   const isGeoCorrection =
     market.monthsBelow200DMA >= 3 && market.drawdownFrom52wHigh >= 15;
   if (isGeoCorrection) {
@@ -164,4 +166,3 @@ export function calculateFundDeployment(
     return { name: fund.name, amount, weight: fund.weightPercent };
   });
 }
-

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { calculateMultiplier } from "@/lib/signal-engine";
 import { marketRowToSnapshot, type MarketDataRow } from "@/lib/market-snapshot";
 

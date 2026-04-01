@@ -25,9 +25,7 @@ export async function GET() {
       .maybeSingle<MarketDataRow>();
 
     if (latestError) {
-      if (process.env.NODE_ENV !== "production") {
-        console.error("market_data latest lookup failed", latestError);
-      }
+      console.error("market_data latest lookup failed", latestError.message);
       return NextResponse.json(
         { ok: false, error: "MARKET_DATA_LOOKUP_FAILED" },
         { status: 500 },
@@ -43,13 +41,13 @@ export async function GET() {
 
     return NextResponse.json(buildSignalSuccessPayload(latest), { status: 200 });
   } catch (err) {
-    if (process.env.NODE_ENV !== "production") {
-      console.error("GET /api/signal failed", err);
-    }
+    console.error(
+      "GET /api/signal failed",
+      err instanceof Error ? err.message : err,
+    );
     return NextResponse.json(
-      { ok: false, error: "SIGNAL_UNAVAILABLE" },
-      { status: 503 },
+      { ok: false, error: "SIGNAL_INTERNAL_ERROR" },
+      { status: 500 },
     );
   }
 }
-
