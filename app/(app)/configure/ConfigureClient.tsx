@@ -23,28 +23,46 @@ type FundAllocation = {
 
 const DEFAULT_ALLOCATIONS: FundAllocation[] = [
   {
-    fund_name: "Nifty 50 Index Fund",
-    fund_category: "index",
-    weight_percent: 40,
-    apply_multiplier: true,
-  },
-  {
-    fund_name: "Flexi Cap Fund",
+    fund_name: "PPFAS Flexi Cap",
     fund_category: "flexi_cap",
-    weight_percent: 30,
+    weight_percent: 29,
     apply_multiplier: true,
   },
   {
-    fund_name: "Small Cap Fund",
-    fund_category: "small_cap",
-    weight_percent: 20,
+    fund_name: "Quant Multi Asset",
+    fund_category: "multi_asset",
+    weight_percent: 21,
     apply_multiplier: true,
   },
   {
-    fund_name: "Gold Fund",
+    fund_name: "Gold",
     fund_category: "gold",
-    weight_percent: 10,
+    weight_percent: 21,
     apply_multiplier: false,
+  },
+  {
+    fund_name: "Nifty 50",
+    fund_category: "index",
+    weight_percent: 11,
+    apply_multiplier: false,
+  },
+  {
+    fund_name: "Midcap 150",
+    fund_category: "mid_cap",
+    weight_percent: 9,
+    apply_multiplier: true,
+  },
+  {
+    fund_name: "Small Cap",
+    fund_category: "small_cap",
+    weight_percent: 6,
+    apply_multiplier: true,
+  },
+  {
+    fund_name: "Global AI",
+    fund_category: "global",
+    weight_percent: 3,
+    apply_multiplier: true,
   },
 ];
 
@@ -145,7 +163,16 @@ export function ConfigureClient(props: {
   function updateAllocation(idx: number, patch: Partial<FundAllocation>) {
     setAllocations((prev) => {
       const next = prev.slice();
-      next[idx] = { ...next[idx], ...patch };
+      const candidate = { ...next[idx], ...patch };
+      if (
+        patch.fund_category !== undefined &&
+        String(patch.fund_category || "")
+          .trim()
+          .toLowerCase() === "gold"
+      ) {
+        candidate.apply_multiplier = false;
+      }
+      next[idx] = candidate;
       return next;
     });
   }
