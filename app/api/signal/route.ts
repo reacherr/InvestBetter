@@ -1,16 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { calculateMultiplier, type MarketSnapshot } from "@/lib/signal-engine";
+import { calculateMultiplier } from "@/lib/signal-engine";
+import { marketRowToSnapshot, type MarketDataRow } from "@/lib/market-snapshot";
 import { createClient } from "@/lib/supabase/server";
-
-type MarketDataRow = {
-  date: string;
-  nifty_close: number;
-  nifty_pe: number;
-  india_vix: number;
-  ma_200: number | null;
-  pe_5yr_avg: number | null;
-};
 
 export async function GET() {
   try {
@@ -49,17 +41,7 @@ export async function GET() {
       );
     }
 
-    const snapshot: MarketSnapshot = {
-      niftyPE: latest.nifty_pe,
-      pe5yrAvg: latest.pe_5yr_avg ?? latest.nifty_pe,
-      niftyClose: latest.nifty_close,
-      ma200: latest.ma_200 ?? latest.nifty_close,
-      vix: latest.india_vix,
-      monthsBelow200DMA: 0,
-      drawdownFrom52wHigh: 0,
-    };
-
-    const result = calculateMultiplier(snapshot);
+    const result = calculateMultiplier(marketRowToSnapshot(latest));
 
     return NextResponse.json(
       {

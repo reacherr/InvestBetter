@@ -1,3 +1,5 @@
+import "server-only";
+
 export interface MarketSnapshot {
   niftyPE: number;
   pe5yrAvg: number;
@@ -34,7 +36,11 @@ export function calculateMultiplier(market: MarketSnapshot): SignalResult {
   let geoOverride = false;
   const breakdown: SignalBreakdownItem[] = [];
 
-  const peRatio = market.niftyPE / market.pe5yrAvg;
+  const pe5yrAvgSafe =
+    Number.isFinite(market.pe5yrAvg) && market.pe5yrAvg > 0
+      ? market.pe5yrAvg
+      : market.niftyPE;
+  const peRatio = market.niftyPE / pe5yrAvgSafe;
 
   // --- PE Signal ---
   if (market.niftyPE > 30) {

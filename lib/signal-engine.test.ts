@@ -72,6 +72,13 @@ describe("calculateMultiplier", () => {
     expect(res.multiplier).toBe(2.0);
   });
 
+  it("uses a safe PE average when pe5yrAvg is zero or invalid", () => {
+    const res = calculateMultiplier(baseMarket({ pe5yrAvg: 0, niftyPE: 22 }));
+    expect(res.peSignal).toBe(0);
+    const valuation = res.breakdown.find((b) => b.signal === "Valuation");
+    expect(valuation?.condition).toBe("Valuation looks neutral");
+  });
+
   it("enforces cap and floor boundaries", () => {
     const capped = calculateMultiplier(
       baseMarket({
