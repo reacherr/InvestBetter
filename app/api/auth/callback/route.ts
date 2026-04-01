@@ -37,7 +37,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const provisioning = await ensureFirstLoginProvisioning(supabase, user.id);
+    const provisioning = await ensureFirstLoginProvisioning(supabase, user);
     const destination = provisioning.hasSipConfig ? "/dashboard" : "/configure";
     return NextResponse.redirect(new URL(destination, url.origin));
   } catch (err) {

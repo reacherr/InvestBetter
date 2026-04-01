@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
 
 type ProvisioningResult = {
   hasSipConfig: boolean;
@@ -6,8 +7,14 @@ type ProvisioningResult = {
 
 export async function ensureFirstLoginProvisioning(
   supabase: SupabaseClient,
-  userId: string,
+  user: User,
 ): Promise<ProvisioningResult> {
+  if (!user.email) {
+    throw new Error("User email missing from auth profile");
+  }
+
+  const userId = user.id;
+
   const { data: existingProfile, error: profileSelectError } = await supabase
     .from("profiles")
     .select("id")
@@ -21,7 +28,14 @@ export async function ensureFirstLoginProvisioning(
   if (!existingProfile) {
     const { error: profileInsertError } = await supabase
       .from("profiles")
-      .insert({ id: userId });
+      .insert({
+        id: userId,
+        email: user.email,
+        name:
+          typeof user.user_metadata?.full_name === "string"
+            ? user.user_metadata.full_name
+            : null,
+      });
 
     if (profileInsertError) {
       throw profileInsertError;
