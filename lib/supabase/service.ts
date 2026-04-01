@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createClient } from "@supabase/supabase-js";
 
 /** Service role client for webhooks and jobs (bypasses RLS). */

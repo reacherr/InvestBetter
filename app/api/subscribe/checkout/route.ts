@@ -33,14 +33,6 @@ export async function GET(request: Request) {
     redirect("/dashboard");
   }
 
-  try {
-    getPlanId();
-  } catch {
-    return NextResponse.redirect(
-      new URL("/subscribe?error=config", origin),
-    );
-  }
-
   const { data: profile } = await supabase
     .from("profiles")
     .select("email,name")
@@ -56,18 +48,18 @@ export async function GET(request: Request) {
 
   const displayName = safeDisplayName(email, name);
 
-  const rz = getRazorpay();
-  const planId = getPlanId();
-
-  const { data: subRow } = await supabase
-    .from("subscriptions")
-    .select("razorpay_customer_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  let customerId = subRow?.razorpay_customer_id ?? null;
-
   try {
+    const planId = getPlanId();
+    const rz = getRazorpay();
+
+    const { data: subRow } = await supabase
+      .from("subscriptions")
+      .select("razorpay_customer_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    let customerId = subRow?.razorpay_customer_id ?? null;
+
     if (!customerId) {
       const customer = await rz.customers.create({
         email,
@@ -93,7 +85,6 @@ export async function GET(request: Request) {
       }
     }
 
-    // Razorpay API requires customer_id; SDK RequestBody types omit it.
     const rzSub = await rz.subscriptions.create({
       plan_id: planId,
       customer_id: customerId,
@@ -120,11 +111,20 @@ export async function GET(request: Request) {
 
     if (subUpErr) {
       console.error("Failed to store subscription id", subUpErr.message);
+      return NextResponse.redirect(
+        new URL("/subscribe?error=save", origin),
+      );
     }
 
     return NextResponse.redirect(rzSub.short_url);
   } catch (e) {
-    console.error("subscribe checkout failed", e instanceof Error ? e.message : e);
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("RAZORPAY_PLAN_ID")) {
+      return NextResponse.redirect(
+        new URL("/subscribe?error=config", origin),
+      );
+    }
+    console.error("subscribe checkout failed", msg);
     return NextResponse.redirect(
       new URL("/subscribe?error=razorpay", origin),
     );

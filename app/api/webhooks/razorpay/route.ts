@@ -89,7 +89,7 @@ export async function POST(request: Request) {
     switch (event) {
       case "subscription.activated": {
         const end = unixSecondsToIso(entity.current_end);
-        await supabase
+        const { error } = await supabase
           .from("subscriptions")
           .update({
             status: "active",
@@ -98,39 +98,55 @@ export async function POST(request: Request) {
             updated_at: now,
           })
           .eq("user_id", userId);
+        if (error) {
+          console.error("webhook subscription.activated update failed", error.message);
+          return NextResponse.json({ ok: false }, { status: 500 });
+        }
         break;
       }
       case "subscription.charged": {
         const end = unixSecondsToIso(entity.current_end);
-        await supabase
+        const { error } = await supabase
           .from("subscriptions")
           .update({
             ...(end ? { current_period_end: end } : {}),
             updated_at: now,
           })
           .eq("user_id", userId);
+        if (error) {
+          console.error("webhook subscription.charged update failed", error.message);
+          return NextResponse.json({ ok: false }, { status: 500 });
+        }
         break;
       }
       case "subscription.cancelled":
       case "subscription.halted": {
-        await supabase
+        const { error } = await supabase
           .from("subscriptions")
           .update({
             status: "cancelled",
             updated_at: now,
           })
           .eq("user_id", userId);
+        if (error) {
+          console.error("webhook subscription.cancelled update failed", error.message);
+          return NextResponse.json({ ok: false }, { status: 500 });
+        }
         break;
       }
       case "subscription.completed":
       case "subscription.expired": {
-        await supabase
+        const { error } = await supabase
           .from("subscriptions")
           .update({
             status: "expired",
             updated_at: now,
           })
           .eq("user_id", userId);
+        if (error) {
+          console.error("webhook subscription.completed update failed", error.message);
+          return NextResponse.json({ ok: false }, { status: 500 });
+        }
         break;
       }
       default:

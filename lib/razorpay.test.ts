@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { verifyWebhookSignature } from "./razorpay";
+import { unixSecondsToIso, verifyWebhookSignature } from "./razorpay";
 
 describe("verifyWebhookSignature", () => {
   beforeEach(() => {
@@ -25,5 +25,19 @@ describe("verifyWebhookSignature", () => {
 
   it("returns false when signature is missing", () => {
     expect(verifyWebhookSignature("{}", null)).toBe(false);
+  });
+});
+
+describe("unixSecondsToIso", () => {
+  it("converts unix seconds to ISO string", () => {
+    expect(unixSecondsToIso(1_700_000_000)).toBe(
+      new Date(1_700_000_000 * 1000).toISOString(),
+    );
+  });
+
+  it("returns null for invalid input", () => {
+    expect(unixSecondsToIso(null)).toBeNull();
+    expect(unixSecondsToIso(Number.NaN)).toBeNull();
+    expect(unixSecondsToIso("x")).toBeNull();
   });
 });
