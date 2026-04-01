@@ -24,6 +24,10 @@
 .DS_Store
 *.pem
 
+# cursor / tooling
+.cursor/
+.worktrees/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
