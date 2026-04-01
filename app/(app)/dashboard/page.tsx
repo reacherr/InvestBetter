@@ -117,12 +117,20 @@ export default async function DashboardPage() {
             (latest cached market data).
           </p>
         </div>
-        <Link
-          href="/configure"
-          className="text-sm font-medium text-zinc-700 underline-offset-4 hover:underline dark:text-zinc-300"
-        >
-          Edit SIP & funds
-        </Link>
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          <Link
+            href="/configure"
+            className="text-sm font-medium text-zinc-700 underline-offset-4 hover:underline dark:text-zinc-300"
+          >
+            Edit SIP & funds
+          </Link>
+          <Link
+            href="/settings"
+            className="text-sm font-medium text-zinc-700 underline-offset-4 hover:underline dark:text-zinc-300"
+          >
+            Settings
+          </Link>
+        </div>
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
