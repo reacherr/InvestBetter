@@ -1,5 +1,6 @@
 import "server-only";
 
+import { ingestTodayMarketSnapshotIfMissing } from "@/lib/market-data-ingest";
 import { calculateMultiplier } from "@/lib/signal-engine";
 import type { MarketDataRow } from "@/lib/market-snapshot";
 import { marketRowToSnapshot } from "@/lib/market-snapshot";
@@ -45,6 +46,14 @@ type SipConfigRow = {
   } | null;
 };
 
+type EligibleUser = {
+  userId: string;
+  row: SipConfigRow;
+  chatId: string;
+  baseSip: number;
+  suggestedAmount: number;
+};
+
 function subscriptionFromProfile(
   profile: SipConfigRow["profiles"],
 ): SubscriptionRow | null {
@@ -75,15 +84,8 @@ function normalizeSipRow(raw: {
 }
 
 export async function bestEffortRefreshMarketData(): Promise<void> {
-  const raw =
-    process.env.NEXT_PUBLIC_APP_URL ??
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
-  if (!raw) {
-    return;
-  }
-  const base = raw.replace(/\/$/, "");
   try {
-    await fetch(`${base}/api/market-data`, { method: "GET" });
+    await ingestTodayMarketSnapshotIfMissing(createServiceRoleClient());
   } catch {
     // best-effort only
   }
@@ -98,6 +100,7 @@ export async function executeDailyCronNotifications(): Promise<{
   processed: number;
   sent: number;
   skipped: number;
+  markSentFailures?: number;
 }> {
   const supabase = createServiceRoleClient();
   const now = new Date();
@@ -182,9 +185,8 @@ export async function executeDailyCronNotifications(): Promise<{
     candidates.push(row);
   }
 
-  let processed = 0;
-  let sent = 0;
   let skipped = 0;
+  const eligible: EligibleUser[] = [];
 
   for (const row of candidates) {
     const subscription = subscriptionFromProfile(row.profiles);
@@ -204,22 +206,74 @@ export async function executeDailyCronNotifications(): Promise<{
       continue;
     }
 
-    processed += 1;
-
     const baseSip = row.base_sip_amount;
     const suggestedAmount = Math.round(baseSip * engineResult.multiplier);
+    eligible.push({
+      userId: row.user_id,
+      row,
+      chatId,
+      baseSip,
+      suggestedAmount,
+    });
+  }
 
-    const { data: existing, error: existingError } = await supabase
+  const processed = eligible.length;
+
+  if (eligible.length === 0) {
+    return {
+      ok: true,
+      notifyDate,
+      tomorrow,
+      signalMonth,
+      processed: 0,
+      sent: 0,
+      skipped,
+    };
+  }
+
+  const userIds = eligible.map((e) => e.userId);
+
+  const { data: signalRows, error: signalsPrefetchError } = await supabase
+    .from("signals")
+    .select("*")
+    .eq("signal_month", signalMonth)
+    .in("user_id", userIds);
+
+  if (signalsPrefetchError) {
+    return {
+      ok: false,
+      error: "SIGNALS_LOOKUP_FAILED",
+      notifyDate,
+      tomorrow,
+      signalMonth,
+      processed,
+      sent: 0,
+      skipped,
+    };
+  }
+
+  const signalByUser = new Map(
+    (signalRows ?? []).map((s) => [s.user_id as string, s]),
+  );
+
+  let sent = 0;
+  let markSentFailures = 0;
+
+  async function markNotificationSent(signalId: string): Promise<boolean> {
+    const { error } = await supabase
       .from("signals")
-      .select("*")
-      .eq("user_id", row.user_id)
-      .eq("signal_month", signalMonth)
-      .maybeSingle();
-
-    if (existingError) {
-      skipped += 1;
-      continue;
+      .update({ notification_sent: true })
+      .eq("id", signalId);
+    if (error) {
+      markSentFailures += 1;
+      console.error("signals notification_sent update failed", error.message);
+      return false;
     }
+    return true;
+  }
+
+  for (const e of eligible) {
+    const existing = signalByUser.get(e.userId);
 
     if (existing?.notification_sent) {
       skipped += 1;
@@ -232,21 +286,19 @@ export async function executeDailyCronNotifications(): Promise<{
         multiplier: Number(existing.multiplier),
         suggestedAmount: existing.suggested_amount,
       });
-      await sendTelegramMessage(chatId, text);
-      await supabase
-        .from("signals")
-        .update({ notification_sent: true })
-        .eq("id", existing.id);
-      sent += 1;
+      await sendTelegramMessage(e.chatId, text);
+      if (await markNotificationSent(existing.id)) {
+        sent += 1;
+      }
       continue;
     }
 
     const insertPayload = {
-      user_id: row.user_id,
+      user_id: e.userId,
       signal_month: signalMonth,
       multiplier: engineResult.multiplier,
-      base_sip_amount: baseSip,
-      suggested_amount: suggestedAmount,
+      base_sip_amount: e.baseSip,
+      suggested_amount: e.suggestedAmount,
       pe_signal: engineResult.peSignal,
       trend_signal: engineResult.trendSignal,
       vix_signal: engineResult.vixSignal,
@@ -268,7 +320,7 @@ export async function executeDailyCronNotifications(): Promise<{
       const { data: raced } = await supabase
         .from("signals")
         .select("id, notification_sent, multiplier, suggested_amount")
-        .eq("user_id", row.user_id)
+        .eq("user_id", e.userId)
         .eq("signal_month", signalMonth)
         .maybeSingle();
 
@@ -282,12 +334,10 @@ export async function executeDailyCronNotifications(): Promise<{
           multiplier: Number(raced.multiplier),
           suggestedAmount: raced.suggested_amount,
         });
-        await sendTelegramMessage(chatId, text);
-        await supabase
-          .from("signals")
-          .update({ notification_sent: true })
-          .eq("id", raced.id);
-        sent += 1;
+        await sendTelegramMessage(e.chatId, text);
+        if (await markNotificationSent(raced.id)) {
+          sent += 1;
+        }
       }
       continue;
     }
@@ -300,15 +350,13 @@ export async function executeDailyCronNotifications(): Promise<{
     const text = formatCronTelegramMessage({
       signalMonthFirstDayYmd: signalMonth,
       multiplier: engineResult.multiplier,
-      suggestedAmount,
+      suggestedAmount: e.suggestedAmount,
       breakdown: engineResult.breakdown,
     });
-    await sendTelegramMessage(chatId, text);
-    await supabase
-      .from("signals")
-      .update({ notification_sent: true })
-      .eq("id", inserted.id);
-    sent += 1;
+    await sendTelegramMessage(e.chatId, text);
+    if (await markNotificationSent(inserted.id)) {
+      sent += 1;
+    }
   }
 
   return {
@@ -319,5 +367,6 @@ export async function executeDailyCronNotifications(): Promise<{
     processed,
     sent,
     skipped,
+    ...(markSentFailures > 0 ? { markSentFailures } : {}),
   };
 }

@@ -29,9 +29,7 @@ async function handleCron(request: NextRequest) {
     }
     return NextResponse.json(result, { status: 200 });
   } catch (err) {
-    if (process.env.NODE_ENV !== "production") {
-      console.error("cron failed", err);
-    }
+    console.error("cron failed", err instanceof Error ? err.message : err);
     return NextResponse.json({ ok: false, error: "CRON_FAILED" }, { status: 500 });
   }
 }
