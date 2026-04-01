@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
 import { saveFundAllocations, updateSipConfig } from "./actions";
@@ -102,6 +103,7 @@ export function ConfigureClient(props: {
   sipDateChangesLeftThisMonth: number;
   currentResetMonth: string;
 }) {
+  const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
   const [isPending, startTransition] = useTransition();
 
@@ -209,6 +211,7 @@ export function ConfigureClient(props: {
 
         setSipSuccess("Saved.");
         setBufferConfirmed(false);
+        router.refresh();
       } catch (e) {
         setSipError(e instanceof Error ? e.message : "Failed to save.");
       }
@@ -230,6 +233,7 @@ export function ConfigureClient(props: {
           })),
         });
         setAllocSuccess("Saved.");
+        router.refresh();
       } catch (e) {
         setAllocError(e instanceof Error ? e.message : "Failed to save.");
       }

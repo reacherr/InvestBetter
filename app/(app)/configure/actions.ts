@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentIstMonthStartISODate } from "@/lib/ist";
 
 type UpdateSipConfigInput = {
   base_sip_amount: number;
@@ -20,24 +21,6 @@ type SaveFundAllocationsInput = {
     apply_multiplier: boolean;
   }>;
 };
-
-function getCurrentIstMonthStartISODate() {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-  }).formatToParts(new Date());
-
-  const year = parts.find((p) => p.type === "year")?.value;
-  const month = parts.find((p) => p.type === "month")?.value;
-
-  if (!year || !month) {
-    const d = new Date();
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-01`;
-  }
-
-  return `${year}-${month}-01`;
-}
 
 function normalizeIntOrNull(value: unknown) {
   if (value === null || value === undefined) return null;
@@ -194,36 +177,69 @@ export async function saveFundAllocations(input: SaveFundAllocationsInput) {
     throw new Error("Please add at least one fund allocation.");
   }
 
-  const total = allocations.reduce((sum, row) => sum + Number(row.weight_percent || 0), 0);
+  const normalized = allocations.map((row) => {
+    const fund_name = row.fund_name?.trim();
+    const weight_percent = Number(row.weight_percent);
+    const apply_multiplier = Boolean(row.apply_multiplier);
+    const fund_category =
+      row.fund_category === null
+        ? null
+        : String(row.fund_category ?? "")
+            .trim()
+            .toLowerCase() || null;
+
+    if (!fund_name) throw new Error("Fund name is required.");
+    if (!Number.isFinite(weight_percent) || weight_percent < 0 || weight_percent > 100) {
+      throw new Error("Each weight must be a number between 0 and 100.");
+    }
+
+    return { fund_name, fund_category, weight_percent, apply_multiplier };
+  });
+
+  const total = normalized.reduce((sum, row) => sum + row.weight_percent, 0);
   const roundedTotal = Math.round(total * 1000) / 1000;
   if (Math.abs(roundedTotal - 100) > 0.0001) {
     throw new Error("Weights must sum to 100%.");
   }
 
-  for (const row of allocations) {
-    if (!row.fund_name?.trim()) throw new Error("Fund name is required.");
-    const w = Number(row.weight_percent);
-    if (!Number.isFinite(w) || w < 0 || w > 100) {
-      throw new Error("Each weight must be a number between 0 and 100.");
+    const { error: rpcError } = await supabase.rpc("replace_fund_allocations", {
+      p_allocations: normalized,
+    });
+
+  if (rpcError) {
+    // Fallback for environments where the RPC hasn't been applied yet.
+    const msg = rpcError.message ?? "";
+    const missingFn =
+      msg.includes("function") && (msg.includes("does not exist") || msg.includes("42883"));
+
+    if (!missingFn) {
+      throw new Error(rpcError.message);
+    }
+
+    const { data: inserted, error: insertError } = await supabase
+      .from("fund_allocations")
+      .insert(
+        normalized.map((row) => ({
+          user_id: user.id,
+          ...row,
+        })),
+      )
+      .select("id")
+      .limit(1000);
+
+    if (insertError) throw new Error(insertError.message);
+
+    if (inserted?.length) {
+      const keepIds = inserted.map((r) => r.id);
+      const { error: deleteError } = await supabase
+        .from("fund_allocations")
+        .delete()
+        .eq("user_id", user.id)
+        .not("id", "in", `(${keepIds.map((id) => `"${id}"`).join(",")})`);
+
+      if (deleteError) throw new Error(deleteError.message);
     }
   }
-
-  const { error: deleteError } = await supabase
-    .from("fund_allocations")
-    .delete()
-    .eq("user_id", user.id);
-  if (deleteError) throw new Error(deleteError.message);
-
-  const rows = allocations.map((row) => ({
-    user_id: user.id,
-    fund_name: row.fund_name.trim(),
-    fund_category: row.fund_category,
-    weight_percent: row.weight_percent,
-    apply_multiplier: row.apply_multiplier,
-  }));
-
-  const { error: insertError } = await supabase.from("fund_allocations").insert(rows);
-  if (insertError) throw new Error(insertError.message);
 
   revalidatePath("/configure");
   return { ok: true as const };

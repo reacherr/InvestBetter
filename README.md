@@ -43,6 +43,7 @@ npm run build
 Notes:
 - `sip_configs.sip_date` is **1–31**. App logic treats 29–31 as “overflow”: in short months, those users fire on the month’s last day.
 - RLS is enabled for all tables; `market_data` is **public read** by policy.
+- The schema also creates an RPC function `replace_fund_allocations(...)` used to atomically replace allocations (avoids data loss on partial failures).
 
 ### Quick RLS verification (manual)
 
