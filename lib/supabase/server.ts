@@ -23,8 +23,17 @@ export function createClient() {
           for (const { name, value, options } of cookiesToSet) {
             cookieStore.set(name, value, options);
           }
-        } catch {
-          // Server Components can't set cookies; ignore.
+        } catch (err) {
+          if (
+            err instanceof Error &&
+            err.message.includes(
+              "Cookies can only be modified in a Server Action or Route Handler",
+            )
+          ) {
+            return;
+          }
+
+          throw err;
         }
       },
     },
