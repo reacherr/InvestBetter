@@ -100,13 +100,14 @@ async function nseFetchJson<T>(path: string, init?: { signal?: AbortSignal }) {
   let lastErr: unknown = null;
 
   for (let attempt = 0; attempt < 4; attempt++) {
+    let timeout: ReturnType<typeof setTimeout> | null = null;
     try {
       if (!cookie) {
         cookie = await fetchNseCookies();
       }
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 12_000);
+      timeout = setTimeout(() => controller.abort(), 12_000);
       const signal = init?.signal
         ? AbortSignal.any([init.signal, controller.signal])
         : controller.signal;
@@ -138,11 +139,10 @@ async function nseFetchJson<T>(path: string, init?: { signal?: AbortSignal }) {
       if (init?.signal?.aborted) {
         throw err;
       }
-      if (isAbortError(err)) {
-        throw err;
-      }
       const backoffMs = 500 * Math.pow(2, attempt) + Math.floor(Math.random() * 200);
       await sleep(backoffMs);
+    } finally {
+      if (timeout) clearTimeout(timeout);
     }
   }
 
