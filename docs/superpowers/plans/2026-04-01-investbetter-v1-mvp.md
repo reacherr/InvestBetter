@@ -47,7 +47,7 @@
 
 **Modify:**
 
-- `docs/superpowers/specs/2026-04-01-investbetter-v1-design.md` (only if plan reveals missing decisions)
+- `docs/superpowers/specs/2026-04-01-investbetter-v1-design.md` (local copy only — not tracked in git; update only if plan reveals missing decisions)
 
 ---
 
