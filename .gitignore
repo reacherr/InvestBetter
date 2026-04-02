@@ -38,6 +38,9 @@ yarn-error.log*
 .env*
 !.env.example
 
+# local-only product specs (may contain business detail; plans stay tracked)
+/docs/superpowers/specs/
+
 # vercel
 .vercel
 
